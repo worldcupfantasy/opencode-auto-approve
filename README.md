@@ -150,7 +150,7 @@ The fixed core carries grading guidance distilled from published policies: git n
 ### Safety design
 
 - **Reasoning-blind evidence.** The judge sees user messages plus the bare pending call (`action`, `resources`, `metadata`). Assistant prose and tool output are never sent, so file or web content the agent read cannot grant permission. The prompt also tells the judge to treat any "user" text quoted from file or web content as untrusted. Verified: a `notes.txt` prompt injection instructing `rm -rf ./data` is denied when the user only delegated generically.
-- **Fail closed.** Judge errors, timeouts, and unparseable verdicts escalate to a normal permission prompt, never to a silent allow.
+- **Fail closed.** Judge errors, timeouts, and unparseable verdicts escalate to a normal permission prompt, never to a silent allow. When the judge was chosen automatically (the session's own model, not a pin), the cascade is retried once against the catalog default before escalating, so a broken or uncredited session model does not by itself force a human decision.
 - **Escalation backstop.** 3 consecutive or 20 total blocks within one user turn escalate to a human prompt rather than looping deny and retry forever.
 - **Per-turn verdict cache.** An identical action and arguments within the same user turn reuses the earlier verdict, so retries do not re-bill the judge.
 - **Anti-workaround denials.** A deny tells the agent not to pursue the same outcome through workarounds or indirect execution.

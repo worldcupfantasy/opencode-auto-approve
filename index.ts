@@ -345,6 +345,16 @@ const definition: Parameters<typeof Plugin.define>[0] & { tui: boolean } = {
 
     let memoizedDefaultJudge: JudgeModelRef | undefined
 
+    /** The catalog's default model, memoized and resolved without any session. */
+    const resolveDefaultJudge = async (): Promise<JudgeModelRef> => {
+      if (memoizedDefaultJudge !== undefined) return memoizedDefaultJudge
+      const defaults = await ctx.catalog.model.default()
+      const model = defaults.data
+      if (model === null) throw new Error("no judge model configured and no default model available")
+      memoizedDefaultJudge = { providerID: model.providerID, id: model.id }
+      return memoizedDefaultJudge
+    }
+
     const resolveJudge = async (options: ResolvedOptions, sessionID?: string): Promise<JudgeModelRef> => {
       if (options.judge !== undefined) return options.judge
       // Follow the model the conversation is actually using, when we know the
@@ -361,16 +371,14 @@ const definition: Parameters<typeof Plugin.define>[0] & { tui: boolean } = {
           // fall through to the catalog default
         }
       }
-      if (memoizedDefaultJudge !== undefined) return memoizedDefaultJudge
-      const defaults = await ctx.catalog.model.default()
-      const model = defaults.data
-      if (model === null) throw new Error("no judge model configured and no default model available")
-      memoizedDefaultJudge = { providerID: model.providerID, id: model.id }
-      return memoizedDefaultJudge
+      return resolveDefaultJudge()
     }
 
-    const classify = async (evidence: Evidence, options: ResolvedOptions, sessionID?: string): Promise<Decision> => {
-      const stage1Model = await resolveJudge(options, sessionID)
+    const sameModel = (left: JudgeModelRef, right: JudgeModelRef): boolean =>
+      left.providerID === right.providerID && left.id === right.id
+
+    /** Runs the stage-1 → stage-2 cascade against `stage1Model`; throws on any judge failure. */
+    const runCascade = async (evidence: Evidence, options: ResolvedOptions, stage1Model: JudgeModelRef): Promise<Decision> => {
       const policy = buildPolicy(options)
       const stage1 = await withTimeout(ctx.generate.text({ model: stage1Model, prompt: judgePrompt(policy, evidence, 1) }), options.timeoutMs)
       const first = parseVerdict(stage1.text)
@@ -383,6 +391,29 @@ const definition: Parameters<typeof Plugin.define>[0] & { tui: boolean } = {
       const second = parseVerdict(stage2.text)
       if (second === undefined) throw new Error("stage 2 returned no parseable verdict")
       return { verdict: second, reason: parseReason(stage2.text) || parseReason(stage1.text) }
+    }
+
+    const classify = async (evidence: Evidence, options: ResolvedOptions, sessionID?: string): Promise<Decision> => {
+      const primary = await resolveJudge(options, sessionID)
+      try {
+        return await runCascade(evidence, options, primary)
+      } catch (error) {
+        // A judge picked automatically (the session's own model) can fail for
+        // reasons that say nothing about the pending call — a provider error,
+        // a credit limit, or an unusable reply. Before failing closed, retry
+        // once with the catalog default so the call only reaches a human when
+        // no configured judge could judge it. A model the user pinned is left
+        // to fail closed, as configured.
+        if (options.judge !== undefined) throw error
+        const fallback = await resolveDefaultJudge()
+        if (sameModel(fallback, primary)) throw error
+        log(
+          `judge ${primary.providerID}/${primary.id} failed (${
+            error instanceof Error ? error.message : String(error)
+          }); retrying with default ${fallback.providerID}/${fallback.id}`,
+        )
+        return await runCascade(evidence, options, fallback)
+      }
     }
 
     let emitDecision: ((entry: DecisionRecord) => Promise<void>) | undefined
