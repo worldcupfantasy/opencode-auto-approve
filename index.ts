@@ -286,6 +286,21 @@ const definition: Parameters<typeof Plugin.define>[0] & { tui: boolean } = {
   id: "auto-approve",
   tui: true,
   async setup(ctx) {
+    /**
+     * The model catalog moved between OpenCode builds: it is `ctx.catalog.model`
+     * up to 2.0.2 and `ctx.model` from 2.0.26 on. Resolve whichever the running
+     * host exposes so default-judge lookup and judge validation keep working on
+     * both, and raise a clear error instead of a TypeError when neither exists.
+     */
+    const catalogModels = (): (typeof ctx.catalog)["model"] => {
+      const probe = ctx as unknown as { model?: (typeof ctx.catalog)["model"]; catalog?: typeof ctx.catalog }
+      const models = probe.model ?? probe.catalog?.model
+      if (models === undefined) {
+        throw new Error("no model catalog on this OpenCode build (expected ctx.model or ctx.catalog.model)")
+      }
+      return models
+    }
+
     const configRoot = process.env.XDG_CONFIG_HOME ?? path.join(homedir(), ".config")
     const globalOptionsFile = path.join(configRoot, "opencode", "auto-approve.json")
     const projectOptionsFile = path.join(ctx.location.directory, ".opencode", "auto-approve.json")
@@ -348,7 +363,7 @@ const definition: Parameters<typeof Plugin.define>[0] & { tui: boolean } = {
     /** The catalog's default model, memoized and resolved without any session. */
     const resolveDefaultJudge = async (): Promise<JudgeModelRef> => {
       if (memoizedDefaultJudge !== undefined) return memoizedDefaultJudge
-      const defaults = await ctx.catalog.model.default()
+      const defaults = await catalogModels().default()
       const model = defaults.data
       if (model === null) throw new Error("no judge model configured and no default model available")
       memoizedDefaultJudge = { providerID: model.providerID, id: model.id }
@@ -440,7 +455,7 @@ const definition: Parameters<typeof Plugin.define>[0] & { tui: boolean } = {
       }
       const judge: JudgeModelRef = { providerID: input.providerID, id: input.id }
       try {
-        const catalog = await ctx.catalog.model.list()
+        const catalog = await catalogModels().list()
         const models = Array.isArray(catalog) ? catalog : asObject(catalog).data
         const list = Array.isArray(models) ? models : []
         const known = list.some(

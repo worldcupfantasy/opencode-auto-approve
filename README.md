@@ -26,6 +26,8 @@ If your executable is named `opencode`, replace `opencode2` in these commands. R
 
 The feature set was exercised against OpenCode `v2.0.2` and tested end to end on `v0.0.0-beta-19507`, including the `permission.evaluate` hook, the composer badge, `/auto-approve`, the decision panel, and RPC-based configuration. Other beta builds may vary.
 
+The model catalog moved between builds — `ctx.catalog.model` through `2.0.2`, `ctx.model` from `2.0.26` on. The plugin reads whichever the running host exposes, so the default-judge lookup (and judge validation) works on both instead of failing closed on the newer layout.
+
 ### Keep one installation active
 
 The package manager adds the plugin to the global OpenCode configuration. If `~/.config/opencode/plugins/auto-approve` already contains a manual clone, move it outside the plugins folder and remove its entry from `~/.config/opencode/opencode.json`. Two active copies register two permission hooks and every gated call is judged twice.
