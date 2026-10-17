@@ -63,13 +63,13 @@ Run `/auto-approve` (aliases: `/aa`, `/approval`):
 | --- | --- |
 | `/auto-approve` | Toggle the classifier on or off |
 | `/auto-approve on` / `off` | Set it explicitly |
-| `/auto-approve status` | Show judges, cascade, escalation limits, and timeout |
-| `/auto-approve judge <providerID>/<modelID>` | Set the stage-1 judge |
-| `/auto-approve judge2 <providerID>/<modelID>` | Set the stage-2 judge |
+| `/auto-approve status` | Show models, cascade, escalation limits, and timeout |
+| `/auto-approve model <providerID>/<modelID>` | Set the stage-1 model |
+| `/auto-approve model2 <providerID>/<modelID>` | Set the stage-2 model |
 | `/auto-approve log` | Open the decision panel for the session |
 | `/auto-approve clear` | Clear the in-memory decision log |
 
-Toggling and judge changes take effect on the next tool call — the server re-reads its options before every gated call, no restart. Judge references are validated against your model catalog.
+Toggling and model changes take effect on the next tool call — the server re-reads its options before every gated call, no restart. Model references are validated against your model catalog.
 
 ### Composer badge
 

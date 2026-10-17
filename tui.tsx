@@ -167,9 +167,9 @@ export default Plugin.define({
           }
           return
         }
-        case "judge":
-        case "judge2": {
-          const stage = command.toLowerCase() === "judge2" ? 2 : 1
+        case "model":
+        case "model2": {
+          const stage = command.toLowerCase() === "model2" ? 2 : 1
           const value = argument.trim()
           if (stage === 1 && value === "") {
             return void pickJudge()
